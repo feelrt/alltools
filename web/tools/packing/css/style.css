@@ -1,179 +1,201 @@
+/* --- 全局重置 --- */
 :root {
-  --bg-main: #0b1120;
-  --bg-panel: #111827;
-  --bg-card: #0f172a;
-  --border-color: #1f2937;
-  --accent: #38bdf8;
-  --text-primary: #e2e8f0;
-  --text-muted: #94a3b8;
+    --bg-main: #0f172a;
+    --bg-sidebar: #1e293b;
+    --accent-blue: #38bdf8;
+    --border-color: #334155;
+    --card-bg: #0f172a;
 }
 
-* {
-  box-sizing: border-box;
+html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: var(--bg-main); color: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; }
+
+.navbar { height: 60px; background: rgba(15, 23, 42, 0.9) !important; backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color) !important; z-index: 2100; }
+
+.main-wrapper { display: flex; height: calc(100vh - 60px); width: 100vw; position: relative; }
+
+/* 侧边栏布局 */
+#sidebar {
+    width: 420px; min-width: 420px; height: 100%;
+    background-color: var(--bg-sidebar); border-right: 1px solid var(--border-color);
+    display: flex; flex-direction: column; z-index: 2000;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-html,
-body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  font-family: 'Inter', system-ui, sans-serif;
-  background: var(--bg-main);
-  color: var(--text-primary);
+#sidebar-overlay { display: none; position: fixed; inset: 0; top: 60px; background: rgba(0,0,0,0.6); z-index: 1999; backdrop-filter: blur(4px); }
+#sidebar.show + #sidebar-overlay { display: block; }
+
+.sidebar-content { flex-grow: 1; overflow-y: auto; padding: 1.5rem !important; }
+.sidebar-footer { padding: 1.2rem; background: var(--bg-sidebar); border-top: 1px solid var(--border-color); }
+
+/* --- 容器尺寸对齐与提示 (修复文字消失) --- */
+.bin-size-row { display: flex; gap: 10px; align-items: flex-end; padding: 5px 0; }
+.bin-size-item { flex: 1; min-width: 0; position: relative; }
+.input-label-hint {
+    position: relative;
+    margin-top: 20px !important; /* 👈 必须加这个，否则标签会被挡在输入框下面 */
 }
 
-#q-app,
-.packing-layout {
-  height: 100%;
+.input-label-hint::after {
+    content: attr(data-hint);
+    position: absolute;
+    top: -20px;       /* 👈 向上偏移量 */
+    left: 2px;        /* 👈 靠左对齐 */
+    font-size: 11px;
+    color: #94a3b8;
+    white-space: nowrap; /* 防止换行 */
 }
 
-.packing-header {
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border-color);
+/* --- 货物卡片 (修复 Padding) --- */
+.item-card {
+    background: var(--card-bg); border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 20px; margin-bottom: 15px; /* 增加内边距 */
+    transition: all 0.2s;
+    padding: 24px 16px 16px 16px !important; /* 👈 顶部 padding 必须大，给标签留位 */
+    margin-bottom: 20px !important;
+}
+.item-card:hover { border-color: var(--accent-blue); box-shadow: 0 0 10px rgba(56, 189, 248, 0.1); }
+
+/* --- 下拉框与按钮美化 --- */
+.form-control, .form-select {
+    background-color: #1e293b !important; border: 1px solid var(--border-color) !important;
+    color: #f1f5f9 !important; border-radius: 8px; padding: 6px 10px;
 }
 
-.packing-drawer {
-  background: var(--bg-panel);
-  color: var(--text-primary);
-  display: flex;
-  flex-direction: column;
+/* 彻底修复颜色选择器不见的问题 */
+.color-block-select {
+    color: transparent !important;
+    text-shadow: none !important;
+    background-clip: padding-box; /* 确保背景色填满 */
+    border: 1px solid var(--border-color) !important;
 }
 
-.drawer-content {
-  padding: 20px;
-  flex: 1;
-  overflow-y: auto;
+/* 重点：确保 JS 修改 style.backgroundColor 时能刺穿所有限制 */
+select.it-color {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important; /* 彻底禁用默认的小箭头 */
+    color: transparent !important;
+    text-shadow: none !important;
+    cursor: pointer;
+    border: 1px solid var(--border-color) !important;
+    /* 增加一个默认背景图配置，防止 JS 还没加载时是白的 */
+    background-color: #3b82f6;
+}
+/* --- 彻底根除下拉箭头 --- */
+/* 之前丢掉的内边距补回来 */
+select.form-select,
+select.it-color,
+select#bin-unit {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important; /* 👈 关键：强制杀掉 Bootstrap 默认的箭头 SVG */
+    padding-right: 0.75rem !important;  /* 修正因为箭头消失留下的多余右边距 */
 }
 
-.drawer-footer {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-color);
-  background: rgba(15, 23, 42, 0.9);
+/* 针对 IE 的特殊处理（虽然现在很少用了，但为了保险） */
+select::-ms-expand {
+    display: none !important;
+}
+/* 下拉出来的选项一定要有字 */
+.color-block-select option {
+    background-color: #1e293b !important;
+    color: white !important;
+    text-shadow: none !important;
+    padding: 10px;
 }
 
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--text-primary);
-}
-
-.card-surface,
-.item-card,
-.result-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  color: var(--text-primary);
-}
-
-.item-card .q-card__section {
-  padding: 12px 16px;
-}
-
-.item-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.result-card {
-  margin-top: 16px;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
-}
-
-.result-stat {
-  padding: 16px;
-  background: rgba(15, 23, 42, 0.6);
-  border-radius: 12px;
-  border: 1px solid rgba(56, 189, 248, 0.15);
-}
-
+/* 统计与未装入清单 */
+#result-panel { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; }
 .unpacked-item {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 10px;
-  margin-bottom: 6px;
+    background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 8px; padding: 10px 15px; margin-bottom: 8px; color: #fca5a5;
 }
 
-.canvas-page {
-  position: relative;
-  padding: 0;
-  background: var(--bg-main);
+/* 细滚动条 */
+.custom-scrollbar::-webkit-scrollbar { width: 5px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+.modal { z-index: 3000 !important; }
+.modal-backdrop { z-index: 2999 !important; }
+
+/* --- 颜色选择器彻底修复 --- */
+.color-block-select {
+    color: transparent !important;
+    text-shadow: none !important;
+    border: 1px solid var(--border-color) !important;
+    cursor: pointer;
+    transition: transform 0.2s;
 }
 
-#canvas-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
+/* 强制让选中的背景色显现出来 */
+.color-block-select option {
+    background-color: #1e293b !important;
+    color: white !important;
+    padding: 12px;
 }
 
+/* --- 3D 操作指引浮窗 --- */
 .interaction-guide {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-size: 12px;
-  color: var(--text-muted);
-  z-index: 5;
-  pointer-events: none;
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: #94a3b8;
+    font-size: 12px;
+    z-index: 100;
+    pointer-events: none; /* 不挡鼠标 */
 }
 
-.guide-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 6px;
+.guide-item { display: flex; align-items: center; margin-bottom: 6px; }
+.guide-item i { color: var(--accent-blue); margin-right: 8px; font-size: 16px; }
+/* --- 极简高级感输入控件 --- */
+.form-control, .form-select, .it-color {
+    background-color: #1e293b !important;
+    border: 1px solid #334155 !important;
+    color: #f1f5f9 !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important; /* 👈 让过渡变灵动 */
+    outline: none !important;
+    box-shadow: none !important;
 }
 
-.empty-hint {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: rgba(226, 232, 240, 0.4);
+/* --- 悬停时微亮 --- */
+.form-control:hover, .form-select:hover {
+    border-color: #475569 !important;
 }
 
-.color-dot {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+/* --- 重点：选中（聚焦）时的灵动发光效果 --- */
+.form-control:focus, .form-select:focus, .it-color:focus {
+    border-color: var(--accent-blue) !important; /* 变成电光蓝 */
+    background-color: #1e293b !important;
+    /* 👈 增加一层柔和的外发光 */
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15) !important;
+    transform: translateY(-1px); /* 👈 选中时微微上浮，更有交互感 */
 }
 
-.q-field__control {
-  background: rgba(15, 23, 42, 0.7);
-  border-radius: 10px;
+/* --- 针对数字输入框去掉丑陋的箭头 --- */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
-
-.q-field--outlined .q-field__control:before {
-  border-color: var(--border-color);
+input[type=number] {
+    -moz-appearance: textfield;
 }
-
-.q-field--outlined.q-field--focused .q-field__control:before {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
-}
-
+/* 响应式调整 */
 @media (max-width: 768px) {
-  .interaction-guide {
-    bottom: 12px;
-    right: 12px;
-  }
-
-  .pc-guide {
-    display: none;
-  }
+    .pc-guide { display: none; }
+    .mobile-guide { display: block; }
 }
-
 @media (min-width: 769px) {
-  .mobile-guide {
-    display: none;
-  }
+    .pc-guide { display: block; }
+    .mobile-guide { display: none; }
+}
+@media (max-width: 768px) {
+    #sidebar { position: fixed; left: 0; top: 60px; transform: translateX(-100%); width: 85% !important; min-width: unset; height: calc(100vh - 60px); }
+    #sidebar.show { transform: translateX(0); box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
 }

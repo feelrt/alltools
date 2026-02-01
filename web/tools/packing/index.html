@@ -1,152 +1,123 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 装箱引擎</title>
-    <link href="https://cdn.jsdelivr.net/npm/quasar@2/dist/quasar.prod.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/@quasar/extras/material-icons/material-icons.css" rel="stylesheet">
+    <title>3D 装箱引擎 - 最终修复版</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="/tools/packing/css/style.css">
+    <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.prod.js"></script>
 </head>
 <body>
-    <div id="q-app">
-        <q-layout view="hHh lpR fFf" class="packing-layout">
-            <q-header class="packing-header">
-                <q-toolbar>
-                    <q-btn dense flat round icon="menu" @click="drawerOpen = !drawerOpen" class="q-mr-sm gt-sm-hidden"></q-btn>
-                    <q-icon name="inventory_2" size="28px" class="q-mr-sm text-primary"></q-icon>
-                    <q-toolbar-title class="text-weight-bold">智能装箱引擎</q-toolbar-title>
-                    <q-btn flat dense icon="center_focus_strong" label="居中" @click="resetView"></q-btn>
-                    <q-btn flat dense icon="autorenew" :label="autoRotate ? '停止旋转' : '自动旋转'" @click="toggleAutoRotate"></q-btn>
-                </q-toolbar>
-            </q-header>
+<div id="app">
+<nav class="navbar navbar-dark bg-dark border-bottom shadow-sm">
+        <div class="container-fluid position-relative d-flex align-items-center">
+            <button class="btn btn-primary btn-sm d-md-none" id="sidebar-toggle"><i class="bi bi-pencil-square me-1"></i>开始填写</button>
+            <a class="navbar-brand fw-bold text-primary position-absolute start-50 translate-middle-x m-0" href="#">
+                <i class="bi bi-box-seam-fill me-2"></i>智能装箱引擎
+            </a>
+        </div>
+    </nav>
 
-            <q-drawer v-model="drawerOpen" show-if-above bordered class="packing-drawer">
-                <div class="drawer-content">
-                    <div class="section-title">
-                        <q-icon name="straighten" size="20px" class="text-primary"></q-icon>
-                        <span>容器尺寸 (大箱子)</span>
-                    </div>
-                    <q-card flat bordered class="q-mb-md card-surface">
-                        <q-card-section class="row q-col-gutter-sm">
-                            <q-input v-model.number="bin.w" type="number" dense outlined label="宽 W" class="col-3"></q-input>
-                            <q-input v-model.number="bin.h" type="number" dense outlined label="高 H" class="col-3"></q-input>
-                            <q-input v-model.number="bin.d" type="number" dense outlined label="深 D" class="col-3"></q-input>
-                            <q-select v-model="bin.unit" :options="units" dense outlined label="单位" class="col-3"></q-select>
-                        </q-card-section>
-                    </q-card>
-
-                    <div class="section-title row items-center justify-between">
-                        <div class="row items-center">
-                            <q-icon name="widgets" size="20px" class="text-positive"></q-icon>
-                            <span>货物清单</span>
-                        </div>
-                        <q-btn color="positive" icon="add" label="添加" dense rounded @click="addItem"></q-btn>
-                    </div>
-
-                    <div class="item-list">
-                        <q-card v-for="(item, idx) in items" :key="item.id" flat bordered class="q-mb-md item-card">
-                            <q-card-section class="row items-center q-col-gutter-sm">
-                                <q-badge color="primary" class="q-mr-sm">#{{ idx + 1 }}</q-badge>
-                                <q-input v-model="item.name" dense borderless placeholder="名称" class="col"></q-input>
-                                <q-btn flat round dense icon="delete" color="negative" @click="removeItem(item.id)"></q-btn>
-                            </q-card-section>
-                            <q-separator></q-separator>
-                            <q-card-section class="row q-col-gutter-sm">
-                                <q-input v-model.number="item.w" type="number" dense outlined label="宽 W" class="col-3"></q-input>
-                                <q-input v-model.number="item.h" type="number" dense outlined label="高 H" class="col-3"></q-input>
-                                <q-input v-model.number="item.d" type="number" dense outlined label="深 D" class="col-3"></q-input>
-                                <q-select v-model="item.unit" :options="units" dense outlined label="单位" class="col-3"></q-select>
-                            </q-card-section>
-                            <q-card-section class="row q-col-gutter-sm items-center">
-                                <q-select
-                                    v-model="item.color"
-                                    :options="colorOptions"
-                                    option-value="value"
-                                    option-label="label"
-                                    emit-value
-                                    map-options
-                                    dense
-                                    outlined
-                                    label="颜色"
-                                    class="col-6"
-                                >
-                                    <template v-slot:option="scope">
-                                        <q-item v-bind="scope.itemProps">
-                                            <q-item-section avatar>
-                                                <span class="color-dot" :style="{ background: scope.opt.value }"></span>
-                                            </q-item-section>
-                                            <q-item-section>{{ scope.opt.label }}</q-item-section>
-                                        </q-item>
-                                    </template>
-                                    <template v-slot:selected-item="scope">
-                                        <div class="row items-center no-wrap">
-                                            <span class="color-dot q-mr-sm" :style="{ background: scope.opt.value }"></span>
-                                            <span>{{ scope.opt.label }}</span>
-                                        </div>
-                                    </template>
-                                </q-select>
-                                <q-input v-model.number="item.qty" type="number" dense outlined label="数量" class="col-6"></q-input>
-                            </q-card-section>
-                        </q-card>
-                    </div>
-
-                    <q-card v-if="result.visible" flat bordered class="result-card">
-                        <q-card-section class="text-center">
-                            <div class="row justify-center q-gutter-sm q-mb-md">
-                                <q-chip color="positive" text-color="white">装载率: {{ result.packRate }}%</q-chip>
-                                <q-chip color="primary" text-color="white">剩余 {{ result.volumeLeft }} m³</q-chip>
-                            </div>
-                            <div class="result-stat">
-                                <div class="text-caption text-grey">已装载总数</div>
-                                <div class="text-h5 text-positive text-weight-bold">{{ result.packedCount }} / {{ result.total }}</div>
-                            </div>
-                            <div v-if="result.unpacked.length" class="unpacked-list q-mt-md">
-                                <div class="text-negative text-caption q-mb-sm">未能装入货物:</div>
-                                <q-list dense>
-                                    <q-item v-for="item in result.unpacked" :key="item.name" class="unpacked-item">
-                                        <q-item-section>{{ item.name.split('#')[0] }}</q-item-section>
-                                        <q-item-section side>
-                                            <q-badge color="negative">剩余 {{ item.left }} 件</q-badge>
-                                        </q-item-section>
-                                    </q-item>
-                                </q-list>
-                            </div>
-                        </q-card-section>
-                    </q-card>
+    <div class="main-wrapper">
+        <aside id="sidebar">
+            <div class="sidebar-content custom-scrollbar">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-primary bg-opacity-10 p-2 rounded-3 me-3"><i class="bi bi-rulers text-primary"></i></div>
+                    <h6 class="m-0 fw-bold text-uppercase tracking-wider small">容器尺寸 (大箱子)</h6>
                 </div>
-                <div class="drawer-footer">
-                    <q-btn color="primary" class="full-width" size="lg" icon="rocket_launch" label="开始智能装箱计算" @click="runPacking"></q-btn>
-                </div>
-            </q-drawer>
 
-            <q-page-container>
-                <q-page class="canvas-page">
-                    <div id="canvas-container"></div>
-                    <div class="interaction-guide">
-                        <div class="pc-guide">
-                            <div class="guide-item"><q-icon name="mouse" size="16px" class="q-mr-xs"></q-icon>左键：旋转视角</div>
-                            <div class="guide-item"><q-icon name="mouse" size="16px" class="q-mr-xs"></q-icon>右键：平移画面</div>
-                            <div class="guide-item"><q-icon name="zoom_in" size="16px" class="q-mr-xs"></q-icon>滚轮：放大/缩小</div>
-                        </div>
-                        <div class="mobile-guide">
-                            <div class="guide-item"><q-icon name="touch_app" size="16px" class="q-mr-xs"></q-icon>单指：滑动旋转</div>
-                            <div class="guide-item"><q-icon name="open_with" size="16px" class="q-mr-xs"></q-icon>双指：平移/缩放</div>
+                <div class="card mb-4 bg-dark border-secondary border-opacity-25 shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="bin-size-row">
+                            <div class="bin-size-item input-label-hint" data-hint="宽(W)"><input type="number" id="bin-w" class="form-control form-control-sm text-center" value="2.4"></div>
+                            <div class="bin-size-item input-label-hint" data-hint="高(H)"><input type="number" id="bin-h" class="form-control form-control-sm text-center" value="2.6"></div>
+                            <div class="bin-size-item input-label-hint" data-hint="深(D)"><input type="number" id="bin-d" class="form-control form-control-sm text-center" value="12"></div>
+                            <div class="bin-size-item">
+                                <select id="bin-unit" class="form-select form-select-sm fw-bold text-info"><option value="m" selected>m</option><option value="cm">cm</option><option value="mm">mm</option></select>
+                            </div>
                         </div>
                     </div>
-                    <div v-if="!result.visible" class="empty-hint">
-                        <q-icon name="inventory_2" size="64px" class="q-mb-sm"></q-icon>
-                        <div>等待渲染计算数据...</div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-success bg-opacity-10 p-2 rounded-3 me-3"><i class="bi bi-boxes text-success"></i></div>
+                        <h6 class="m-0 fw-bold text-uppercase tracking-wider small">货物清单</h6>
                     </div>
-                </q-page>
-            </q-page-container>
-        </q-layout>
+                    <button id="add-row" class="btn btn-sm btn-success rounded-pill px-3 fw-bold">+ 添加</button>
+                </div>
+
+                <div id="item-list"></div>
+
+                <div id="result-panel" class="card mt-4 d-none animate-fade-in">
+                    <div class="card-body p-4 text-center">
+                        <div class="d-flex justify-content-center gap-2 mb-3">
+                            <span id="pack-rate" class="badge bg-success rounded-pill px-3"></span>
+                            <span id="vol-space" class="badge bg-primary rounded-pill px-3"></span>
+                        </div>
+                        <div class="bg-black bg-opacity-30 p-3 rounded-3 mb-4 border border-secondary border-opacity-20">
+                            <div class="text-secondary small mb-1">已装载总数</div>
+                            <div class="fw-bold fs-3 text-success font-monospace" id="stat-packed">0 / 0</div>
+                        </div>
+                        <div id="unpacked-container" class="d-none text-start pt-2 border-top border-secondary border-opacity-20">
+                            <div class="text-danger small fw-bold mb-3 ms-1"><i class="bi bi-exclamation-circle me-1"></i>未能装入货物:</div>
+                            <div id="unpacked-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button id="run-btn" class="btn btn-primary w-100 py-2 fw-bold shadow-lg">🚀 开始智能装箱计算</button>
+            </div>
+        </aside>
+
+        <div id="sidebar-overlay"></div>
+
+        <main id="canvas-container" class="flex-grow-1 bg-black position-relative">
+            <div class="interaction-guide shadow-lg animate-fade-in">
+                <div class="pc-guide">
+                    <div class="guide-item"><i class="bi bi-mouse"></i> 左键：旋转视角</div>
+                    <div class="guide-item"><i class="bi bi-mouse2"></i> 右键：平移画面</div>
+                    <div class="guide-item"><i class="bi bi-mouse3"></i> 滚轮：放大/缩小</div>
+                </div>
+                <div class="mobile-guide">
+                    <div class="guide-item"><i class="bi bi-fingerprint"></i> 单指：滑动旋转</div>
+                    <div class="guide-item"><i class="bi bi-arrows-move"></i> 双指：平移/缩放</div>
+                </div>
+            </div>
+            <div id="empty-hint" class="position-absolute top-50 start-50 translate-middle text-center opacity-25">
+                <i class="bi bi-box-seam display-1"></i><p class="mt-2 fs-5 text-white">等待渲染计算数据...</p>
+            </div>
+            <div class="position-absolute top-0 end-0 m-3 d-flex gap-2" style="z-index: 100;">
+                <button id="btn-reset-view" class="btn btn-dark btn-sm border-secondary rounded-3 shadow-sm"><i class="bi bi-arrows-fullscreen"></i> 居中</button>
+                <button id="btn-auto-rotate" class="btn btn-dark btn-sm border-secondary rounded-3 shadow-sm"><i class="bi bi-arrow-repeat"></i> 旋转</button>
+            </div>
+        </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/quasar@2/dist/quasar.umd.prod.js"></script>
+    <div class="modal fade" id="msgModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content" style="background: rgba(30, 41, 59, 0.98); border: 1px solid #334155; border-radius: 20px;">
+                <div class="modal-body p-4 text-center">
+                    <h6 class="fw-bold text-white mb-3" id="modalTitle">系统提示</h6>
+                    <p class="text-secondary small mb-4" id="modalMsg"></p>
+                    <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold" data-bs-dismiss="modal">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loader" class="loading-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+        <h6 class="text-white fw-bold tracking-wider">计算中，请稍候...</h6>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
-    <script type="module" src="/tools/packing/js/main.js"></script>
+    <script type="module" src="/tools/packing/js/app_vue.js"></script>
+</div>
 </body>
 </html>
