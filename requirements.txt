@@ -1,6 +1,9 @@
-fastapi
-uvicorn
-py3dbp
-python-multipart
-numpy
-numba
+fastapi>=0.110
+uvicorn[standard]>=0.27
+sqlalchemy>=2.0
+aiosqlite>=0.19
+python-jose>=3.3
+passlib[bcrypt]>=1.7
+pydantic-settings>=2.0
+httpx>=0.27
+stripe>=8.0

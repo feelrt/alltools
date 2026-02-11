@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ToolHub 个人中心</title>
+  <link rel="stylesheet" href="/account/style.css"/>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">ToolHub</div>
+    <div class="links">
+      <a href="/">工具大厅</a>
+      <a href="/tools/packing/index.html">装箱工具</a>
+      <a href="/account/buy.html">购买积分</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid2">
+      <div class="card">
+        <h1>个人中心</h1>
+        <p class="sub">查看账号信息与积分余额。</p>
+        <div class="kv">
+          <div class="k">邮箱</div><div id="email" class="v">-</div>
+          <div class="k">用户名</div><div id="username" class="v">-</div>
+          <div class="k">手机</div><div id="phone" class="v">-</div>
+          <div class="k">积分余额</div><div id="balance" class="v big">-</div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <a class="btn" href="/tools/packing/index.html">去使用装箱工具</a>
+          <button class="btn ghost" id="logoutBtn">退出登录</button>
+        </div>
+        <div id="msg" class="msg"></div>
+      </div>
+
+      <div class="card">
+        <h2>积分流水</h2>
+        <p class="hint">仅展示最近 50 条。</p>
+        <div id="ledger" class="table"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/account/app.js"></script>
+  <script>
+    const msg = document.getElementById('msg');
+    // 简单的消息提示函数
+    function show(text, ok=false){
+      if(!msg) return; // 安全检查
+      msg.textContent = text || '';
+      msg.className = 'msg ' + (ok ? 'ok' : 'bad');
+    }
+
+    async function load(){
+      try {
+        // --- 1. 获取个人信息 ---
+        // api() 如果失败会抛出错误，所以直接 await 即可
+        const me = await api('/api/v1/auth/me');
+
+        // 修正：后端返回的是直接的对象，没有 .data 这一层
+        // 并且要确保 DOM 元素存在再赋值
+        const elEmail = document.getElementById('email');
+        const elUser = document.getElementById('username');
+        const elPhone = document.getElementById('phone');
+
+        if(elEmail) elEmail.textContent = me.email || '-';
+        if(elUser)  elUser.textContent = me.username || me.identity || '-';
+        if(elPhone) elPhone.textContent = me.phone || '-';
+
+        // --- 2. 获取积分信息 ---
+        const p = await api('/api/v1/auth/points');
+
+        // 修正：同上，直接访问 p.balance
+        const elBalance = document.getElementById('balance');
+        if(elBalance) elBalance.textContent = String(p.balance || 0);
+
+        // --- 3. 渲染流水记录 ---
+        const box = document.getElementById('ledger');
+        if(box) {
+          const rows = p.ledger || [];
+          if(rows.length === 0){
+            box.innerHTML = '<div class="hint">暂无记录</div>';
+          } else {
+            const html = ['<div class="thead"><div>时间</div><div>变动</div><div>原因</div><div>备注</div></div>'];
+            for(const r of rows){
+              const sign = r.change > 0 ? '+' : '';
+              const amountClass = r.change > 0 ? 'pos' : 'neg';
+              // 注意：后端返回的时间可能是 ISO 字符串
+              const timeStr = new Date(r.created_at).toLocaleString();
+
+              html.push(`
+                <div class="trow">
+                  <div>${timeStr}</div>
+                  <div class="${amountClass}">${sign}${r.change}</div>
+                  <div>${r.reason || ''}</div>
+                  <div>${r.note || ''}</div>
+                </div>
+              `);
+            }
+            box.innerHTML = html.join('');
+          }
+        }
+
+      } catch (err) {
+        console.error("加载失败:", err);
+        // 如果是未登录(401)，跳转回登录页
+        // 注意：这里假设 api() 抛出的 error.message 包含状态码或后端没返回详细信息
+        // 简单处理：如果加载个人信息失败，多半是 Token 过期
+        show('会话已过期，请重新登录');
+        setTimeout(() => location.href = '/account/login.html', 1000);
+      }
+    }
+
+    // 退出登录逻辑
+    const btnLogout = document.getElementById('logoutBtn');
+    if(btnLogout){
+      btnLogout.addEventListener('click', async () => {
+        try {
+          await api('/api/v1/auth/logout', {method:'POST'});
+          show('已退出', true);
+        } catch(e) {
+          console.error(e);
+        }
+        setTimeout(() => location.href = '/account/login.html', 400);
+      });
+    }
+
+    // 启动加载
+    load();
+  </script>
+</body>
+</html>

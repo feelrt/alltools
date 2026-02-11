@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ToolHub 购买积分</title>
+  <link rel="stylesheet" href="/account/style.css"/>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">ToolHub</div>
+    <div class="links">
+      <a href="/">工具大厅</a>
+      <a href="/account/profile.html">个人中心</a>
+      <a href="/admin/index.html">管理员</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <h1>购买积分</h1>
+      <p class="sub">支付由 Stripe Checkout 托管。支付成功后，积分会通过 webhook 自动入账。</p>
+      <div id="status" class="msg"></div>
+      <div class="sep"></div>
+      <div id="pkgs" class="pkggrid"></div>
+      <p class="hint" style="margin-top:14px">如需支持支付宝/PayPal，请在 Stripe 后台开启对应 Payment Methods，然后在管理员后台打开渠道开关。</p>
+    </div>
+  </div>
+
+  <script src="/account/app.js"></script>
+  <script>
+    const statusBox = document.getElementById('status');
+    const params = new URLSearchParams(location.search);
+    const st = params.get('status');
+
+    // 处理支付回跳状态
+    if(st==='success'){
+      statusBox.textContent='支付完成：若积分未立即显示，请稍等片刻（webhook 入账）。';
+      statusBox.className='msg ok';
+    } else if(st==='cancel'){
+      statusBox.textContent='已取消支付。';
+      statusBox.className='msg bad';
+    } else {
+      statusBox.textContent='';
+      statusBox.className='msg';
+    }
+
+    async function load(){
+      // 1. 验证登录
+      try {
+        // api() 如果是 401 会抛出错误，直接进 catch
+        await api('/api/v1/auth/me');
+      } catch(e) {
+        // 未登录或 Token 过期
+        location.href = '/account/login.html';
+        return;
+      }
+
+      // 2. 加载套餐
+      try {
+        const pkgs = await api('/api/v1/billing/packages');
+        // 注意：后端通常直接返回数组，不是 res.data
+        const list = Array.isArray(pkgs) ? pkgs : [];
+
+        const box = document.getElementById('pkgs');
+        if(list.length === 0){
+            box.innerHTML='<div class="hint">暂无可用套餐，请联系管理员。</div>';
+            return;
+        }
+
+        box.innerHTML = list.map(p=>`
+          <div class="pkg">
+            <div class="pname">${p.name}</div>
+            <div class="ppoints">${p.points} 积分</div>
+            <div class="pprice">${(p.amount_cents/100).toFixed(2)} ${p.currency}</div>
+            <button class="btn small" onclick="doBuy(${p.id})">立即购买</button>
+          </div>
+        `).join('');
+
+        window.doBuy = async function(pid){
+            statusBox.textContent='正在前往 Lemon Squeezy 支付...';
+            statusBox.className='msg';
+
+            try {
+                // 不再需要 method 参数
+                const res = await api('/api/v1/billing/checkout', {
+                    method:'POST',
+                    body: { package_id: pid }
+                });
+
+                if(res && res.checkout_url) {
+                    location.href = res.checkout_url;
+                }
+            } catch(err) {
+                statusBox.textContent = err.message || "创建订单失败";
+                statusBox.className = 'msg bad';
+            }
+        }
+
+        // 3. 绑定购买按钮事件
+        box.querySelectorAll('button[data-id]').forEach(btn=>{
+          btn.addEventListener('click', async ()=>{
+            statusBox.textContent='正在创建支付订单…';
+            statusBox.className='msg';
+            const pid = Number(btn.getAttribute('data-id'));
+
+            try {
+                // 请求创建 Checkout Session
+                const res = await api('/api/v1/billing/checkout?package_id='+encodeURIComponent(pid), {method:'POST'});
+
+                // 成功后跳转到 Stripe 支付页
+                if(res && res.checkout_url) {
+                    location.href = res.checkout_url;
+                } else {
+                    throw new Error("返回数据异常");
+                }
+            } catch(err) {
+                console.error(err);
+                statusBox.textContent = err.message || "创建订单失败";
+                statusBox.className = 'msg bad';
+            }
+          })
+        })
+
+      } catch(e) {
+        statusBox.textContent = "加载套餐失败: " + e.message;
+        statusBox.className='msg bad';
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

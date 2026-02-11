@@ -1,6 +1,15 @@
 import time
 import numpy as np
-from numba import njit
+
+# Numba 在某些环境（例如 coverage 版本冲突）可能不可用。
+# 为了保证服务能启动，这里做降级：无 numba 时仍可运行，只是速度会慢一些。
+try:
+    from numba import njit  # type: ignore
+except Exception:  # pragma: no cover
+    def njit(*args, **kwargs):
+        def _wrap(fn):
+            return fn
+        return _wrap
 
 
 # --- 核心优化：将搜索逻辑全部移入 Numba ---
@@ -65,19 +74,39 @@ class SmartPacker:
         self.height_map = np.zeros((self.bin_w + 1, self.bin_d + 1), dtype=np.int32)
 
     def get_rotations(self, w, h, d):
-        """几何去重"""
-        dims = (int(w), int(h), int(d))
-        unique_dims = sorted(list(set(dims)))
-        if len(unique_dims) == 1: return [dims]
-        if len(unique_dims) == 2:
-            w, h, d = dims
-            return list(set([(w, h, d), (h, d, w), (d, w, h)]))
-        w, h, d = dims
-        return list(set([(w, h, d), (w, d, h), (h, w, d), (h, d, w), (d, w, h), (d, h, w)]))
+        """几何去重（保序）。
 
-    def add_item_group(self, name, w, h, d, count):
+        旧实现用 set() 去重会打乱旋转顺序，导致“先填充”时姿态不可控（可能竖起来）。
+        这里改为：生成全部 6 种排列 -> 按出现顺序去重。
+        """
+        w, h, d = int(w), int(h), int(d)
+        perms = [
+            (w, h, d), (w, d, h),
+            (h, w, d), (h, d, w),
+            (d, w, h), (d, h, w),
+        ]
+        seen = set()
+        out = []
+        for t in perms:
+            if t not in seen:
+                seen.add(t)
+                out.append(t)
+        return out
+
+    def add_item_group(self, name, w, h, d, count, *, prefer_low_height: bool = False):
+        """批量装入同类物品。
+
+        prefer_low_height=True：用于“先填充”阶段。
+        含义：
+          1) 旋转优先选“最矮”为高度（rh 最小优先），让箱子尽量“躺平”。
+          2) 同高度下优先更大的底面面积（rw*rd 更大），视觉更像“铺层”。
+
+        注意：仍然会尝试全部旋转；只是顺序变得可控，避免随机竖放。
+        """
         iw, ih, id_ = int(w), int(h), int(d)
         rotations = self.get_rotations(iw, ih, id_)
+        if prefer_low_height:
+            rotations = sorted(rotations, key=lambda t: (t[1], -(t[0] * t[2])))
 
         for _ in range(count):
             placed = False
@@ -99,6 +128,8 @@ class SmartPacker:
                     })
                     placed = True
                     break
+
+            # 如果一个也放不下，直接结束（保持原行为：无返回/无异常）
 
 
 def calculate_smart_factor(dims):
@@ -150,12 +181,71 @@ def run_packing(data):
 
     packer = SmartPacker(scaled_bin_w, scaled_bin_h, scaled_bin_d)
 
+    # --- 计算逻辑 (保持不变) ---
+    all_dims = [data.bin_size[0], data.bin_size[1], data.bin_size[2]]
+    for item in data.items:
+        all_dims.extend([item.w, item.h, item.d])
+
+    # prefilled 也参与 factor 计算，保证缩放一致
+    prefilled_for_factor = getattr(data, "prefilled", None) or []
+    for it in prefilled_for_factor:
+        all_dims.extend([it.pos[0], it.pos[1], it.pos[2], it.dim[0], it.dim[1], it.dim[2]])
+
+    factor = calculate_smart_factor(all_dims)
+
+    scaled_bin_w = data.bin_size[0] // factor
+    scaled_bin_h = data.bin_size[1] // factor
+    scaled_bin_d = data.bin_size[2] // factor
+
+    packer = SmartPacker(scaled_bin_w, scaled_bin_h, scaled_bin_d)
+
+    # --- ✅ 新增：先把 prefilled（已固定放置）的物品“压入”高度图 ---
+    prefilled = getattr(data, "prefilled", None) or []
+    if prefilled:
+        for it in prefilled:
+            # 坐标/尺寸统一按 mm 传入，这里按 factor 缩放
+            x = int(it.pos[0] // factor)
+            z = int(it.pos[1] // factor)
+            y = int(it.pos[2] // factor)
+            w = int(it.dim[0] // factor)
+            h = int(it.dim[1] // factor)
+            d = int(it.dim[2] // factor)
+
+            # 基本校验
+            if w <= 0 or h <= 0 or d <= 0:
+                raise ValueError("prefilled 物品尺寸必须为正数")
+            if x < 0 or y < 0 or z < 0:
+                raise ValueError("prefilled 物品坐标不能为负数")
+            if x + w > scaled_bin_w or y + d > scaled_bin_d or z + h > scaled_bin_h:
+                raise ValueError("prefilled 物品超出容器范围")
+
+            new_z = z + h
+            # height_map 表达占用：对区域做 max
+            region = packer.height_map[x: x + w, y: y + d]
+            packer.height_map[x: x + w, y: y + d] = np.maximum(region, new_z)
+
     # 排序
-    sorted_items = sorted(data.items, key=lambda x: (x.w * x.h * x.d, x.h), reverse=True)
+    # - 总智能装箱：体积大/高度大优先（原策略）
+    # - 先填充：更像“铺层”，同等体积下更矮更优先
+    phase = (getattr(data, "phase", None) or "auto").lower()
+    if phase == "prefill":
+        sorted_items = sorted(
+            data.items,
+            key=lambda x: (min(x.w, x.h, x.d), -(sorted([x.w, x.h, x.d])[1] * max(x.w, x.h, x.d)), x.w * x.h * x.d),
+        )
+    else:
+        sorted_items = sorted(data.items, key=lambda x: (x.w * x.h * x.d, x.h), reverse=True)
 
     # 核心装箱循环
     for item in sorted_items:
-        packer.add_item_group(item.name, item.w // factor, item.h // factor, item.d // factor, item.count)
+        packer.add_item_group(
+            item.name,
+            item.w // factor,
+            item.h // factor,
+            item.d // factor,
+            item.count,
+            prefer_low_height=(phase == "prefill"),
+        )
 
     # --- 【新增】统计未装入的货物 ---
     # 1. 统计实际装了多少 (packer.items 里是平铺的，需要聚合)

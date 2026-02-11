@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ToolHub 注册</title>
+  <link rel="stylesheet" href="/account/style.css"/>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">ToolHub</div>
+    <div class="links">
+      <a href="/">工具大厅</a>
+      <a href="/tools/packing/index.html">装箱工具</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card" style="max-width:720px;margin:0 auto;">
+      <h1>创建账号</h1>
+      <p class="sub">必填：邮箱、用户名、密码；可选：手机。</p>
+
+      <div class="grid2" style="gap:14px">
+        <div>
+          <label>邮箱（必填）</label>
+          <input id="email" placeholder="name@example.com"/>
+        </div>
+        <div>
+          <label>用户名（必填）</label>
+          <input id="username" placeholder="例如 feelrt"/>
+        </div>
+        <div>
+          <label>密码（必填）</label>
+          <input id="password" type="password" placeholder="至少 6 位"/>
+        </div>
+        <div>
+          <label>手机（可选）</label>
+          <input id="phone" placeholder="+86..."/>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="regBtn">注册并登录</button>
+        <a class="link" href="/account/login.html">已有账号？去登录 →</a>
+      </div>
+      <div id="msg" class="msg"></div>
+    </div>
+  </div>
+
+  <script src="/account/app.js"></script>
+  <script>
+    const msg = document.getElementById('msg');
+    function show(text, ok=false){
+      msg.textContent = text || '';
+      msg.className = 'msg ' + (ok ? 'ok' : 'bad');
+    }
+
+    document.getElementById('regBtn').addEventListener('click', async ()=>{
+      show('');
+      const email = document.getElementById('email').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const phone = document.getElementById('phone').value.trim();
+      if(!email || !username || !password){ show('请填写邮箱/用户名/密码'); return; }
+      const res = await api('/api/v1/auth/register', {method:'POST', body:{email, username, password, phone: phone || null}});
+      if(res.ok){ show('注册成功，正在跳转…', true); setTimeout(()=>location.href='/account/profile.html', 600); }
+      else{ show(prettyError(res.data)); }
+    });
+  </script>
+</body>
+</html>

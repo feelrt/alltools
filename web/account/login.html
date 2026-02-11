@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ToolHub 会员登录</title>
+  <link rel="stylesheet" href="/account/style.css"/>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">ToolHub</div>
+    <div class="links">
+      <a href="/">工具大厅</a>
+      <a href="/tools/packing/index.html">装箱工具</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid2">
+      <div>
+        <h1>欢迎回来</h1>
+        <p class="sub">登录后即可使用工具（会按后台配置消耗积分）。</p>
+        <div class="card">
+          <label>邮箱或用户名</label>
+          <input id="identity" placeholder="email 或 username"/>
+          <label>密码</label>
+          <input id="password" type="password" placeholder="••••••••"/>
+          <div class="row">
+            <button class="btn" id="loginBtn">登录</button>
+            <a class="link" href="/account/register.html">没有账号？去注册 →</a>
+          </div>
+          <div id="msg" class="msg"></div>
+          <div class="sep"></div>
+          <button class="btn ghost" id="googleBtn">使用 Google 登录</button>
+          <p class="hint">提示：如果你还没配置 Google OAuth，会提示未配置。</p>
+        </div>
+      </div>
+
+      <div class="card hero">
+        <h2>积分规则（可后台配置）</h2>
+        <ul>
+          <li>注册默认赠送积分</li>
+          <li>使用每个工具会扣对应积分</li>
+          <li>可购买积分，支持 Stripe 多支付方式</li>
+        </ul>
+        <a class="btn small" href="/account/buy.html">去购买积分</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/account/app.js"></script>
+  <script>
+    const msg = document.getElementById('msg');
+
+    // 显示消息的辅助函数
+    function show(text, ok=false){
+      msg.textContent = text || '';
+      // 根据状态切换 class，ok=true 显示绿色(假设CSS支持)，否则显示红色(bad)
+      msg.className = 'msg ' + (ok ? 'ok' : 'bad');
+    }
+
+    // 1. 普通账号登录逻辑修复
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      show(''); // 清空旧消息
+      const identity = document.getElementById('identity').value.trim();
+      const password = document.getElementById('password').value;
+
+      if(!identity || !password){
+        show('请填写账号和密码');
+        return;
+      }
+
+      try {
+        // 使用 try...catch 捕获 api() 抛出的错误
+        const res = await api('/api/v1/auth/login', {
+          method: 'POST',
+          body: { identity, password }
+        });
+
+        // 如果代码执行到这里，说明 HTTP 状态码是 2xx (成功)
+        show('登录成功，正在跳转…', true);
+        setTimeout(() => location.href = '/account/profile.html', 500);
+
+      } catch (err) {
+        // 捕获 app.js 中抛出的 "throw new Error(msg)"
+        // err.message 就是后端返回的 detail 错误信息
+        console.error(err);
+        show(err.message);
+      }
+    });
+
+    // 2. Google 登录逻辑修复 (同样加上 try...catch)
+    const googleBtn = document.getElementById('googleBtn');
+    if (googleBtn) {
+        googleBtn.addEventListener('click', async () => {
+          show('');
+          try {
+            const res = await api('/api/v1/auth/google/login');
+            // 成功获取跳转链接
+            if (res && res.auth_url) {
+                location.href = res.auth_url;
+            }
+          } catch (err) {
+            show(err.message);
+          }
+        });
+    }
+  </script>
+</body>
+</html>

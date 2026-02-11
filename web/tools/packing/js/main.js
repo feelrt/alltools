@@ -148,9 +148,12 @@ document.getElementById('run-btn').onclick = async () => {
         loader.style.display = 'flex';
         const res = await fetch('/api/v1/tools/packing/calculate', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ bin_size: binSizeMM, items: itemsForBackend })
         });
+        if (res.status === 401) { window.location.href = '/account/login.html'; return; }
+        if (res.status === 402) { window.location.href = '/account/buy.html'; return; }
         const data = await res.json();
         if (data.status === "success") {
             document.getElementById('empty-hint').style.display = 'none';

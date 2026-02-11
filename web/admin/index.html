@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ToolHub 管理后台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <style>
+    /* 自定义样式微调 */
+    body { background-color: #f8f9fa; min-height: 100vh; display: flex; flex-direction: column; }
+    .sidebar { min-height: 100vh; background-color: #212529; color: white; }
+    .sidebar .nav-link { color: rgba(255,255,255,.75); margin-bottom: 4px; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: rgba(255,255,255,.1); }
+    .sidebar .nav-link i { margin-right: 8px; }
+    .content-area { padding: 20px; flex: 1; }
+    .card { box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075); border: none; margin-bottom: 20px; }
+    .card-header { background-color: #fff; border-bottom: 1px solid #eee; font-weight: 600; }
+
+    /* 隐藏所有 Tab 内容，JS控制显示 */
+    .tab-view { display: none; }
+    .tab-view.active { display: block; }
+
+    .loading-overlay { position: fixed; top:0;left:0;right:0;bottom:0; background:rgba(255,255,255,0.8); z-index:9999; display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+
+<div class="d-flex w-100" id="app">
+
+  <div class="sidebar d-flex flex-column flex-shrink-0 p-3 text-white" style="width: 250px;">
+    <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+      <span class="fs-4 fw-bold">ToolHub Admin</span>
+    </a>
+    <hr>
+    <ul class="nav nav-pills flex-column mb-auto">
+      <li class="nav-item">
+        <a href="#" class="nav-link active" data-target="view-users">
+          <i class="bi bi-people"></i> 用户管理
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-target="view-billing">
+          <i class="bi bi-credit-card"></i> 套餐与支付
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-target="view-config">
+          <i class="bi bi-sliders"></i> 全局配置
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-target="view-system">
+          <i class="bi bi-shield-lock"></i> 管理员设置
+        </a>
+      </li>
+    </ul>
+    <hr>
+    <div class="dropdown">
+      <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+        <img src="https://ui-avatars.com/api/?name=Admin&background=random" alt="" width="32" height="32" class="rounded-circle me-2">
+        <strong id="adminName">Admin</strong>
+      </a>
+      <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser1">
+        <li><a class="dropdown-item" href="/" target="_blank">前往前台</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="#" id="logoutBtn">退出登录</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="content-area overflow-auto" style="height: 100vh;">
+
+    <div id="alertPlaceholder"></div>
+
+    <div id="view-users" class="tab-view active">
+      <h3 class="mb-4">用户列表 (User List)</h3>
+      <div class="card">
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>用户名</th>
+                  <th>邮箱</th>
+                  <th>积分余额</th>
+                  <th class="text-end">操作</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-billing" class="tab-view">
+      <h3 class="mb-4">套餐与支付 (Billing)</h3>
+
+      <div class="row">
+        <div class="col-md-5">
+          <div class="card h-100">
+            <div class="card-header">支付渠道开关</div>
+            <div class="card-body" id="channelsBox">
+              </div>
+          </div>
+        </div>
+
+        <div class="col-md-7">
+          <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>积分套餐配置</span>
+              <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#pkgModal"><i class="bi bi-plus"></i> 新增套餐</button>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <thead><tr><th>名称</th><th>积分</th><th>价格(分)</th><th>状态</th><th>操作</th></tr></thead>
+                  <tbody id="pkgTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-config" class="tab-view">
+      <h3 class="mb-4">全局配置 (Config)</h3>
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">注册赠送</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label">新用户注册自动赠送积分</label>
+                <input type="number" id="signupBonus" class="form-control" placeholder="0">
+              </div>
+              <button class="btn btn-primary" onclick="saveBonus()">保存设置</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">Packing 工具扣费</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label">单次计算扣除积分</label>
+                <input type="number" id="packingCost" class="form-control" placeholder="1">
+              </div>
+              <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="packingEnabled">
+                <label class="form-check-label" for="packingEnabled">启用工具</label>
+              </div>
+              <button class="btn btn-primary" onclick="savePacking()">保存配置</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-system" class="tab-view">
+      <h3 class="mb-4">管理员设置 (System)</h3>
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">修改我的密码</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label>旧密码</label>
+                <input type="password" id="oldPwd" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label>新密码</label>
+                <input type="password" id="newPwd" class="form-control">
+              </div>
+              <button class="btn btn-warning" onclick="changePwd()">确认修改</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">新增管理员</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label>用户名</label>
+                <input type="text" id="newAdminUser" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label>初始密码</label>
+                <input type="password" id="newAdminPwd" class="form-control">
+              </div>
+              <button class="btn btn-success" onclick="addAdmin()">创建管理员</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="pointsModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">变更用户积分</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editUserId">
+        <p>当前用户: <strong id="editUserName"></strong></p>
+        <div class="mb-3">
+          <label class="form-label">变动数量 (正数为加，负数为减)</label>
+          <input type="number" id="editAmount" class="form-control" placeholder="例如: 100 或 -50">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">备注 (理由)</label>
+          <input type="text" id="editNote" class="form-control" placeholder="例如: 系统补偿 / 违规扣除">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="submitPointsAdjust()">确认提交</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="pkgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">新增积分套餐</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2"><label>名称</label><input id="pkgName" class="form-control" placeholder="Starter"></div>
+        <div class="mb-2"><label>积分</label><input type="number" id="pkgPoints" class="form-control"></div>
+        <div class="mb-2"><label>金额(分)</label><input type="number" id="pkgAmount" class="form-control"></div>
+        <div class="mb-2"><label>货币</label><input id="pkgCurrency" class="form-control" value="USD"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="addPkg()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/account/app.js"></script>
+<script>
+  // === 全局工具函数 ===
+  const alertPlaceholder = document.getElementById('alertPlaceholder');
+  function showAlert(message, type='success') {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+      <div class="alert alert-${type} alert-dismissible fade show m-3" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>`;
+    alertPlaceholder.innerHTML = ''; // 清除旧的
+    alertPlaceholder.append(wrapper);
+    setTimeout(()=>wrapper.remove(), 3000); // 3秒自动消失
+  }
+
+  // === 页面导航逻辑 ===
+  document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      // 1. 切换 Active 样式
+      document.querySelectorAll('.sidebar .nav-link').forEach(n => n.classList.remove('active'));
+      link.classList.add('active');
+      // 2. 切换显示的 Tab
+      const targetId = link.getAttribute('data-target');
+      document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+      document.getElementById(targetId).classList.add('active');
+      // 3. 触发数据刷新 (可选)
+      if(targetId === 'view-users') loadUsers();
+      if(targetId === 'view-billing') { loadChannels(); loadPackages(); }
+      if(targetId === 'view-config') { loadBonus(); loadPacking(); }
+    });
+  });
+
+  // === 初始化检查登录 ===
+  async function init(){
+    try {
+      const me = await api('/api/v1/admin/me');
+      document.getElementById('adminName').textContent = me.username;
+      // 默认加载首页数据
+      loadUsers();
+    } catch(e) {
+      location.href = '/admin/login.html';
+    }
+  }
+
+  // === 1. 用户管理逻辑 ===
+  let currentUsers = [];
+  async function loadUsers(){
+    try {
+      // 添加 ?t=... 防止 GET 请求缓存
+      const users = await api('/api/v1/admin/users?t=' + new Date().getTime());
+
+      currentUsers = users;
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td>${u.id}</td>
+          <td>${u.username}</td>
+          <td>${u.email}</td>
+          <td><span class="badge bg-secondary font-monospace fs-6">${u.balance !== undefined ? u.balance : '-'}</span></td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" onclick="openPointsModal(${u.id})">
+              <i class="bi bi-pencil-square"></i> 变更积分
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    } catch(e){ showAlert('加载用户失败', 'danger'); }
+  }
+
+  // 打开积分弹窗
+  window.openPointsModal = function(uid){
+    const u = currentUsers.find(x => x.id === uid);
+    document.getElementById('editUserId').value = uid;
+    document.getElementById('editUserName').textContent = u ? u.username : uid;
+    document.getElementById('editAmount').value = '';
+    document.getElementById('editNote').value = '';
+    new bootstrap.Modal(document.getElementById('pointsModal')).show();
+  }
+
+  // 提交积分变更
+  window.submitPointsAdjust = async function(){
+    const uid = Number(document.getElementById('editUserId').value);
+    const amount = Number(document.getElementById('editAmount').value);
+    const note = document.getElementById('editNote').value;
+
+    if(!amount || amount === 0) { alert('请输入有效的变动数量'); return; }
+
+    try {
+      // 获取后端返回的最新结果 (res 包含 {ok: true, balance: 123})
+      const res = await api('/api/v1/admin/points/adjust', {
+        method: 'POST',
+        body: { user_id: uid, amount, note }
+      });
+
+      bootstrap.Modal.getInstance(document.getElementById('pointsModal')).hide();
+      showAlert(`操作成功！当前积分: ${res.balance}`);
+
+      // 【关键优化】直接更新当前表格中的这一行，无需刷新整个列表
+      // 找到这一行
+      const row = Array.from(document.querySelectorAll('#usersTableBody tr')).find(tr => tr.cells[0].textContent == uid);
+      if(row) {
+         // 第4列是积分 (索引3)
+         row.cells[3].innerHTML = `<span class="badge bg-secondary font-monospace fs-6">${res.balance}</span>`;
+      }
+
+      // 同时也刷新一下全列表（兜底）
+      loadUsers();
+
+    } catch(e) {
+      alert('操作失败: ' + e.message);
+    }
+  }
+
+  // === 2. 财务配置逻辑 ===
+  async function loadChannels(){
+    const list = await api('/api/v1/admin/payment-channels');
+    const html = list.map(c => `
+      <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+        <span class="fw-bold text-uppercase">${c.channel_key}</span>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" ${c.enabled?'checked':''}
+            onchange="toggleChannel('${c.channel_key}', this.checked)">
+        </div>
+      </div>
+    `).join('');
+    document.getElementById('channelsBox').innerHTML = html;
+  }
+
+  window.toggleChannel = async (key, enabled) => {
+    await api('/api/v1/admin/payment-channels/'+encodeURIComponent(key), {method:'PUT', body:{enabled}});
+    showAlert('支付渠道状态已更新');
+  }
+
+  async function loadPackages(){
+    const list = await api('/api/v1/admin/packages');
+    const tbody = document.getElementById('pkgTableBody');
+    tbody.innerHTML = list.map(p => `
+      <tr>
+        <td>${p.name}</td>
+        <td>${p.points}</td>
+        <td>${p.amount_cents} ${p.currency}</td>
+        <td><span class="badge bg-${p.enabled?'success':'secondary'}">${p.enabled?'启用':'禁用'}</span></td>
+        <td>
+          <button class="btn btn-xs btn-link text-decoration-none"
+            onclick="togglePkg(${p.id}, ${!p.enabled})">${p.enabled?'禁用':'启用'}</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  window.togglePkg = async (id, enabled) => {
+    // 需要先获取原数据(略微繁琐，这里简化直接传enabled)
+    // 实际项目中最好有单个获取接口，或者从列表缓存取
+    // 这里为了演示，我们假设只改 enabled，其他字段后端需要处理或者我们需要传完整
+    // 由于后端API是PUT更新整个对象，我们得先找到原始对象
+    const pkgs = await api('/api/v1/admin/packages'); // 重新获取一次确保准确
+    const target = pkgs.find(x=>x.id===id);
+    if(target){
+      await api('/api/v1/admin/packages/'+id, {method:'PUT', body:{...target, enabled}});
+      loadPackages();
+    }
+  }
+
+  window.addPkg = async () => {
+    const name = document.getElementById('pkgName').value;
+    const points = Number(document.getElementById('pkgPoints').value);
+    const amount_cents = Number(document.getElementById('pkgAmount').value);
+    const currency = document.getElementById('pkgCurrency').value;
+    await api('/api/v1/admin/packages', {method:'POST', body:{name, points, amount_cents, currency}});
+    bootstrap.Modal.getInstance(document.getElementById('pkgModal')).hide();
+    loadPackages();
+  }
+
+  // === 3. 全局配置逻辑 ===
+  async function loadBonus(){
+    const res = await api('/api/v1/admin/config/signup_bonus_points');
+    document.getElementById('signupBonus').value = res.value;
+  }
+  window.saveBonus = async () => {
+    const v = Number(document.getElementById('signupBonus').value);
+    await api('/api/v1/admin/config/signup_bonus_points', {method:'PUT', body:{value:v}});
+    showAlert('注册赠送配置已保存');
+  }
+
+  async function loadPacking(){
+    const res = await api('/api/v1/admin/tools/packing');
+    document.getElementById('packingCost').value = res.cost_points;
+    document.getElementById('packingEnabled').checked = res.enabled;
+  }
+  window.savePacking = async () => {
+    const cost = Number(document.getElementById('packingCost').value);
+    const enabled = document.getElementById('packingEnabled').checked;
+    await api('/api/v1/admin/tools/packing', {method:'PUT', body:{cost_points:cost, enabled}});
+    showAlert('Packing 工具配置已保存');
+  }
+
+  // === 4. 系统设置 ===
+  window.changePwd = async () => {
+    try {
+      await api('/api/v1/admin/change-password', {
+        method:'POST',
+        body:{
+          old_password: document.getElementById('oldPwd').value,
+          new_password: document.getElementById('newPwd').value
+        }
+      });
+      showAlert('密码修改成功', 'success');
+      document.getElementById('oldPwd').value = '';
+      document.getElementById('newPwd').value = '';
+    } catch(e) { showAlert(e.message, 'danger'); }
+  }
+
+  window.addAdmin = async () => {
+    try {
+      await api('/api/v1/admin/admins', {
+        method:'POST',
+        body: {
+          username: document.getElementById('newAdminUser').value,
+          password: document.getElementById('newAdminPwd').value
+        }
+      });
+      showAlert('新管理员已创建', 'success');
+      document.getElementById('newAdminUser').value = '';
+      document.getElementById('newAdminPwd').value = '';
+    } catch(e) { showAlert(e.message, 'danger'); }
+  }
+
+  // 退出登录
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await api('/api/v1/admin/logout', {method:'POST'});
+    location.href = '/admin/login.html';
+  });
+
+  // 启动
+  init();
+</script>
+</body>
+</html>

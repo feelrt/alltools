@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>管理员登录</title>
+  <link rel="stylesheet" href="/account/style.css"/>
+</head>
+<body>
+  <div class="nav">
+    <div class="brand">ToolHub Admin</div>
+    <div class="links">
+      <a href="/">工具大厅</a>
+      <a href="/account/login.html">会员</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card" style="max-width:620px;margin:0 auto">
+      <h1>管理员登录</h1>
+      <p class="sub">默认管理员：feelrt / 000000（首次登录后请立刻改密码）</p>
+      <label>用户名</label>
+      <input id="username" placeholder="feelrt"/>
+      <label>密码</label>
+      <input id="password" type="password" placeholder="••••••••"/>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="loginBtn">登录</button>
+        <a class="link" href="/admin/index.html">进入后台 →</a>
+      </div>
+      <div id="msg" class="msg"></div>
+    </div>
+  </div>
+
+  <script src="/account/app.js"></script>
+  <script>
+    const msg = document.getElementById('msg');
+    function show(text, ok=false){ msg.textContent=text||''; msg.className='msg ' + (ok?'ok':'bad'); }
+    document.getElementById('loginBtn').addEventListener('click', async ()=>{
+      show('');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if(!username || !password){ show('请填写用户名与密码'); return; }
+      const res = await api('/api/v1/admin/login', {method:'POST', body:{username, password}});
+      if(res.ok){ show('登录成功，跳转中…', true); setTimeout(()=>location.href='/admin/index.html', 500); }
+      else{ show(prettyError(res.data)); }
+    })
+  </script>
+</body>
+</html>
